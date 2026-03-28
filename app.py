@@ -222,3 +222,6 @@ elif st.session_state.app_step == 3:
     if st.button("New Scan"):
         for k in ['app_step', 'final_pdf', 'final_text']: del st.session_state[k]
         st.rerun()
+
+
+        #hello#
