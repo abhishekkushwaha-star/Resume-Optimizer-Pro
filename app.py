@@ -121,13 +121,11 @@ try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # We explicitly define the model without a version prefix 
-    # to let the latest library handle the routing.
+    # Using the 'models/' prefix forces the stable path
     model = genai.GenerativeModel('models/gemini-1.5-flash') 
     
 except Exception as e:
-    st.error(f"Model Configuration Error: {e}")
-    st.stop()
+    st.error(f"Configuration Error: {e}")
 
 # --- Auth Sidebar ---
 with st.sidebar:
