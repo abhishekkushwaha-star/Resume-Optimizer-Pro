@@ -116,16 +116,18 @@ st.set_page_config(page_title="Resume Optimizer Pro", page_icon="🎯", layout="
 if 'app_step' not in st.session_state: st.session_state.app_step = 1
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- UPDATED INITIALIZATION ---
+# --- COMPLETELY STABLE INITIALIZATION ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     
-    # Using the 'models/' prefix forces the stable path
-    model = genai.GenerativeModel('models/gemini-1.5-flash') 
+    # We remove 'models/' and 'v1beta' entirely. 
+    # The 0.8.3 library will correctly route 'gemini-1.5-flash' to the stable API.
+    model = genai.GenerativeModel('gemini-1.5-flash') 
     
 except Exception as e:
     st.error(f"Configuration Error: {e}")
+    st.stop()
 
 # --- Auth Sidebar ---
 with st.sidebar:
@@ -223,5 +225,4 @@ elif st.session_state.app_step == 3:
         for k in ['app_step', 'final_pdf', 'final_text']: del st.session_state[k]
         st.rerun()
 
-
-        #hello#
+        
