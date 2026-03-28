@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import pdfplumber
 import io
 import json
@@ -73,7 +73,7 @@ def create_pdf(text):
     contact_style = ParagraphStyle('Contact', parent=styles['Normal'], alignment=1, fontSize=9, spaceAfter=12, textColor=HexColor("#7F8C8D"))
     section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=12, spaceBefore=12, spaceAfter=4, textColor=HexColor("#2980B9"), fontName="Helvetica-Bold", textTransform="uppercase")
     body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, spaceAfter=4, textColor=black, leading=14)
-    bullet_style = ParagraphStyle('Bullet', parent=styles['Normal'], fontSize=10, leftIndent=12, spaceAfter=3, textColor=black, leading=14)
+    bullet_style = ParagraphStyle('Bullet', parent=styles['Normal'], leftIndent=12, spaceAfter=3, textColor=black, leading=14)
     job_left_style = ParagraphStyle('JobLeft', parent=styles['Normal'], fontSize=11, textColor=black, leading=14)
     job_right_style = ParagraphStyle('JobRight', parent=styles['Normal'], fontSize=10, alignment=2, textColor=HexColor("#7F8C8D"), leading=14)
 
@@ -109,22 +109,16 @@ def create_pdf(text):
     return buffer.getvalue()
 
 # ==========================================
-# 3. APP INITIALIZATION & RETRY LOGIC
+# 3. APP INITIALIZATION (NEW GOOGLE GENAI SDK)
 # ==========================================
 st.set_page_config(page_title="Resume Optimizer Pro", page_icon="🎯", layout="wide")
 
 if 'app_step' not in st.session_state: st.session_state.app_step = 1
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- COMPLETELY STABLE INITIALIZATION ---
+# Initialize the NEW client
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-    
-    # We remove 'models/' and 'v1beta' entirely. 
-    # The 0.8.3 library will correctly route 'gemini-1.5-flash' to the stable API.
-    model = genai.GenerativeModel('gemini-1.5-flash') 
-    
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception as e:
     st.error(f"Configuration Error: {e}")
     st.stop()
@@ -140,11 +134,15 @@ with st.sidebar:
         st.header("🔐 Pro Login")
         user = st.text_input("Username")
         pw = st.text_input("Password", type="password")
-        if st.button("Login"):
+        col1, col2 = st.columns(2)
+        if col1.button("Login"):
             if verify_login(user, pw):
                 st.session_state.logged_in = True
                 st.session_state.username = user
                 st.rerun()
+        if col2.button("Register"):
+            if create_user(user, pw): st.success("Registered! Now Login.")
+            else: st.error("User exists.")
 
 # ==========================================
 # STEP 1: SCAN & ANALYZE
@@ -166,20 +164,19 @@ if st.session_state.app_step == 1:
                     st.session_state.jd_text = jd_text
                     
                     prompt = f"Identify 3-5 missing skills from this Resume: {resume_text} for this JD: {jd_text}. Return ONLY raw JSON: [{{'skill': '...', 'suggestion': '...'}}]"
-                    response = model.generate_content(prompt)
+                    
+                    # NEW SDK CALL
+                    response = client.models.generate_content(
+                        model='gemini-1.5-flash',
+                        contents=prompt
+                    )
+                    
                     clean_json = response.text.replace("```json", "").replace("```", "").strip()
                     st.session_state.gap_data = json.loads(clean_json)
                     st.session_state.app_step = 2
                     st.rerun()
             except Exception as e:
-                if "429" in str(e):
-                    st.warning("🚦 Rate limit hit. Waiting 30s...")
-                    progress = st.progress(0)
-                    for i in range(30):
-                        time.sleep(1)
-                        progress.progress((i + 1) / 30)
-                    st.info("Ready! Click Analyze again.")
-                else: st.error(f"Error: {e}")
+                st.error(f"Error: {e}")
 
 # ==========================================
 # STEP 2: BRIDGE THE GAP
@@ -212,10 +209,15 @@ elif st.session_state.app_step == 2:
 elif st.session_state.app_step == 3:
     st.title("🎯 Step 3: Final PDF")
     if 'final_pdf' not in st.session_state:
-        # Construct final prompt with approved skills
         added_text = "\n".join([f"- {s['bullet']}" for s in st.session_state.approved])
         final_prompt = f"Rewrite resume {st.session_state.resume_text} for JD {st.session_state.jd_text}. Add these: {added_text}. Format: # Name \n CONTACT: ... \n ## SUMMARY \n ## EXPERIENCE \n ### Company | Role | Loc | Date \n - Bullets"
-        response = model.generate_content(final_prompt)
+        
+        # NEW SDK CALL
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=final_prompt
+        )
+        
         st.session_state.final_pdf = create_pdf(response.text)
         st.session_state.final_text = response.text
 
@@ -224,5 +226,3 @@ elif st.session_state.app_step == 3:
     if st.button("New Scan"):
         for k in ['app_step', 'final_pdf', 'final_text']: del st.session_state[k]
         st.rerun()
-
-        
