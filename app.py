@@ -167,7 +167,7 @@ if st.session_state.app_step == 1:
                     
                     # NEW SDK CALL
                     response = client.models.generate_content(
-                        model='gemini-1.5-flash',
+                        model='gemini-2.5-flash',
                         contents=prompt
                     )
                     
@@ -214,7 +214,7 @@ elif st.session_state.app_step == 3:
         
         # NEW SDK CALL
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.5-flash',
             contents=final_prompt
         )
         
